@@ -30,13 +30,15 @@ import petlib
 from os import urandom
 from petlib.cipher import Cipher
 
+aes = Cipher("aes-128-gcm")
+
 def encrypt_message(K, message):
     """ Encrypt a message under a key K """
 
     plaintext = message.encode("utf8")
-    
+    iv = urandom(16)
     ## YOUR CODE HERE
-
+    ciphertext, tag = aes.quick_gcm_enc(K,iv,plaintext)
     return (iv, ciphertext, tag)
 
 def decrypt_message(K, iv, ciphertext, tag):
@@ -45,6 +47,7 @@ def decrypt_message(K, iv, ciphertext, tag):
         In case the decryption fails, throw an exception.
     """
     ## YOUR CODE HERE
+    plain = aes.quick_gcm_dec(K,iv,ciphertext,tag)
 
     return plain.encode("utf8")
 
@@ -76,9 +79,9 @@ def is_point_on_curve(a, b, p, x, y):
     assert isinstance(b, Bn)
     assert isinstance(p, Bn) and p > 0
     assert (isinstance(x, Bn) and isinstance(y, Bn)) \
-           or (x == None and y == None)
+           or (x is None and y is None)
 
-    if x == None and y == None:
+    if x is None and y is None:
         return True
 
     lhs = (y * y) % p
@@ -99,9 +102,33 @@ def point_add(a, b, p, x0, y0, x1, y1):
 
     Return the point resulting from the addition. Raises an Exception if the points are equal.
     """
+    if ((x0 == x1) or
+            (not is_point_on_curve(a, b, p, x0, y0)) or
+            (not is_point_on_curve(a, b, p, x1, y1))):
+        return(None, None)
 
     # ADD YOUR CODE BELOW
-    xr, yr = None, None
+    if ((x0,y0) == (x1,y1)):
+        raise Exception('EC Points must not be equal')
+    
+    if ((x1, y1) == (None, None)):
+        return (x0, y0)
+    
+    if ((x0, y0) == (None, None)):
+        return (x1, y1)
+
+    lam1 = y1.mod_sub(y0,p)
+    lam2 = (x1.mod_sub(x0,p)).mod_pow(-1,p)
+    lam = lam1.mod_mul(lam2,p)
+
+    xr1 = lam.mod_pow(2,p)
+    xr2 = xr1.mod_sub(x0,p)
+    xr = xr2.mod_sub(x1,p)
+
+    yr1 = x0.mod_sub(xr,p)
+    yr2 = lam.mod_mul(yr1,p)
+    yr = yr2.mod_sub(y0,p)
+    # xr, yr = None, None
     
     return (xr, yr)
 
