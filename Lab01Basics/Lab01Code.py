@@ -102,32 +102,38 @@ def point_add(a, b, p, x0, y0, x1, y1):
 
     Return the point resulting from the addition. Raises an Exception if the points are equal.
     """
-    if ((x0 == x1) or
-            (not is_point_on_curve(a, b, p, x0, y0)) or
-            (not is_point_on_curve(a, b, p, x1, y1))):
-        return(None, None)
+    if (str(x0) == str(x1)) and (str(y0) == str(y1)):
+        raise Exception("EC Points must not be equal")
+        
+    if (
+        (str(x0) == str(x1)) or \
+        (not is_point_on_curve(a, b, p, x0, y0) or \
+          not is_point_on_curve(a, b, p, x1, y1))):
+        return (None, None)
 
     # ADD YOUR CODE BELOW
-    if ((x0,y0) == (x1,y1)):
-        raise Exception('EC Points must not be equal')
     
-    if ((x1, y1) == (None, None)):
-        return (x0, y0)
-    
-    if ((x0, y0) == (None, None)):
+    if (x0 is None and y0 is None):
         return (x1, y1)
+    
+    if (x1 is None and  y1 is None):
+        return (x0, y0)
 
-    lam1 = y1.mod_sub(y0,p)
-    lam2 = (x1.mod_sub(x0,p)).mod_pow(-1,p)
-    lam = lam1.mod_mul(lam2,p)
+    xqminxp = x1.mod_sub(x0, p)
+    yqminyp = y1.mod_sub(y0, p)
 
-    xr1 = lam.mod_pow(2,p)
-    xr2 = xr1.mod_sub(x0,p)
-    xr = xr2.mod_sub(x1,p)
+    xqminxpmodinv = xqminxp.mod_inverse(m=p)
+    lam = xqminxpmodinv.mod_mul(yqminyp, p)
 
-    yr1 = x0.mod_sub(xr,p)
-    yr2 = lam.mod_mul(yr1,p)
-    yr = yr2.mod_sub(y0,p)
+    # calculate xr
+    lamsq = lam.mod_mul(lam, p)
+    lamsqmin = lamsq.mod_sub(x0, p)
+    xr = lamsqmin.mod_sub(x1, p)
+
+    # calculate yr
+    xpminxr = x0.mod_sub(xr, p)
+    lamxpxr = lam.mod_mul(xpminxr, p)
+    yr = lamxpxr.mod_sub(y0, p)
     # xr, yr = None, None
     
     return (xr, yr)
@@ -144,8 +150,23 @@ def point_double(a, b, p, x, y):
     Returns the point representing the double of the input (x, y).
     """  
 
+    if x is None and y is None:
+        return None, None
+
     # ADD YOUR CODE BELOW
-    xr, yr = None, None
+    lam1 = ((x.mod_mul(x,p)).mod_mul(Bn(3), p)).mod_add(a,p)
+    lam2 = (y.mod_mul(Bn(2),p)).mod_inverse(m=p)
+    
+    lam = lam1.mod_mul(lam2,p)
+
+    xr1 = lam.mod_pow(Bn(2),p)
+    xr2 = x.mod_mul(Bn(2),p)
+    xr = xr1.mod_sub(xr2,p)
+
+    yr1 = x.mod_sub(xr,p)
+    yr2 = lam.mod_mul(yr1,p)
+    yr = yr2.mod_sub(y,p)
+
 
     return xr, yr
 
@@ -165,9 +186,12 @@ def point_scalar_multiplication_double_and_add(a, b, p, x, y, scalar):
     """
     Q = (None, None)
     P = (x, y)
+    binRep = bin(scalar)[::-1]
 
     for i in range(scalar.num_bits()):
-        pass ## ADD YOUR CODE HERE
+        if binRep[i] == '1':
+            Q = point_add(a, b, p, Q[0], Q[1], P[0], P[1])
+        P = point_double(a, b, p, P[0], P[1])
 
     return Q
 
@@ -189,11 +213,20 @@ def point_scalar_multiplication_montgomerry_ladder(a, b, p, x, y, scalar):
         return R0
 
     """
+    # Computes point mult in a fixed amount of time 
     R0 = (None, None)
     R1 = (x, y)
+    binRep = bin(scalar)[::-1]
+
 
     for i in reversed(range(0,scalar.num_bits())):
-        pass ## ADD YOUR CODE HERE
+        if binRep[i] == '0':
+            R1 = point_add(a, b, p, R0[0], R0[1], R1[0], R1[1])
+            R0 = point_double(a,b,p,R0[0],R0[1])
+        else:
+            R0 = point_add(a, b, p, R0[0], R0[1], R1[0], R1[1])
+            R1 = point_double(a,b,p,R1[0],R1[1])
+
 
     return R0
 
@@ -206,7 +239,7 @@ def point_scalar_multiplication_montgomerry_ladder(a, b, p, x, y, scalar):
 #          - Implement ECDSA signature verification 
 #            using petlib.ecdsa
 
-from hashlib import sha256
+from hashlib import sha256, sha1
 from petlib.ec import EcGroup
 from petlib.ecdsa import do_ecdsa_sign, do_ecdsa_verify
 
@@ -222,8 +255,9 @@ def ecdsa_key_gen():
 def ecdsa_sign(G, priv_sign, message):
     """ Sign the SHA256 digest of the message using ECDSA and return a signature """
     plaintext =  message.encode("utf8")
-
     ## YOUR CODE HERE
+    digest = sha1(plaintext).digest()
+    sig = do_ecdsa_sign(G, priv_sign, digest)
 
     return sig
 
@@ -232,7 +266,8 @@ def ecdsa_verify(G, pub_verify, message, sig):
     plaintext =  message.encode("utf8")
 
     ## YOUR CODE HERE
-
+    digest = sha1(plaintext).digest()
+    res = do_ecdsa_verify(G, pub_verify, sig, digest)
     return res
 
 #####################################################
@@ -261,7 +296,16 @@ def dh_encrypt(pub, message, aliceSig = None):
     """
     
     ## YOUR CODE HERE
-    pass
+    G, priv_dec, pub_enc = dh_get_key()
+    freshKey = pub.pt_add(priv_dec)
+    
+    plaintext = message.encode("utf8")
+    iv = urandom(16)
+    ciphertext, tag = aes.quick_gcm_enc(K,iv,plaintext)
+    
+    return (iv, ciphertext, tag, pub_enc)
+
+    
 
 def dh_decrypt(priv, ciphertext, aliceVer = None):
     """ Decrypt a received message encrypted using your public key, 
@@ -275,6 +319,7 @@ def dh_decrypt(priv, ciphertext, aliceVer = None):
 #  ensure they run using the "py.test filename" command.
 #  What is your test coverage? Where is it missing cases?
 #  $ py.test-2.7 --cov-report html --cov Lab01Code Lab01Code.py 
+test_G, test_priv_key, test_pub_key = dh_get_key()
 
 def test_encrypt():
     assert False
