@@ -47,7 +47,10 @@ def decrypt_message(K, iv, ciphertext, tag):
         In case the decryption fails, throw an exception.
     """
     ## YOUR CODE HERE
-    plain = aes.quick_gcm_dec(K,iv,ciphertext,tag)
+    try:
+        plain = aes.quick_gcm_dec(K,iv,ciphertext,tag)
+    except:
+        raise Exception("decryption failed")
 
     return plain.encode("utf8")
 
@@ -296,12 +299,12 @@ def dh_encrypt(pub, message, aliceSig = None):
     """
     
     ## YOUR CODE HERE
-    G, priv_dec, pub_enc = dh_get_key()
-    freshKey = pub.pt_add(priv_dec)
-    
+    G, priv_dec, pub_enc = dh_get_key() #generating fresh keys
+    freshKey = pub.pt_mul(priv_dec).export()[:16] #calculating pub*private as per EC-DH algorithm. Export() to remove TypeError. [:16] gives length of 16 which matches iv and removes "Cipher exception: Wrong key length or enc mode." error
+
     plaintext = message.encode("utf8")
     iv = urandom(16)
-    ciphertext, tag = aes.quick_gcm_enc(K,iv,plaintext)
+    ciphertext, tag = aes.quick_gcm_enc(freshKey,iv,plaintext)
     
     return (iv, ciphertext, tag, pub_enc)
 
@@ -313,22 +316,55 @@ def dh_decrypt(priv, ciphertext, aliceVer = None):
     the message came from Alice using her verification key."""
     
     ## YOUR CODE HERE
-    pass
+    iv, ciphertext, tag, pub_enc = ciphertext
+    freshKey = pub_enc.pt_mul(priv).export()[:16]
+    try:
+        plain = aes.quick_gcm_dec(freshKey,iv,ciphertext,tag)
+    except:
+        raise Exception("decryption failed")
+    return plain.encode("utf8")
 
 ## NOTE: populate those (or more) tests
 #  ensure they run using the "py.test filename" command.
 #  What is your test coverage? Where is it missing cases?
 #  $ py.test-2.7 --cov-report html --cov Lab01Code Lab01Code.py 
-test_G, test_priv_key, test_pub_key = dh_get_key()
+test_G, test_priv_dec, test_pub_enc = dh_get_key()
 
 def test_encrypt():
-    assert False
+    message = u"Hello World!"
+    iv, ciphertext, tag, pub_enc = dh_encrypt(test_pub_enc, message)
+    assert len(iv) == 16
+    assert len(ciphertext) == len(message)
+    assert len(tag) == 16
 
 def test_decrypt():
-    assert False
+    message = u"Hello World!"
+    ciphertext = dh_encrypt(test_pub_enc, message)
+
+    dec_message = dh_decrypt(test_priv_dec, ciphertext)
+    assert dec_message == message
 
 def test_fails():
-    assert False
+    from pytest import raises
+
+    message = u"Hello World!"
+    iv, ciphertext, tag, pub_enc = dh_encrypt(test_pub_enc, message)
+
+    with raises(Exception) as excinfo:
+        cipher = iv, urandom(len(ciphertext)), tag, pub_enc
+        dh_decrypt(test_priv_dec, cipher)
+    assert 'decryption failed' in str(excinfo.value)
+
+    with raises(Exception) as excinfo:
+        cipher = iv, ciphertext, urandom(len(tag)), pub_enc
+        dh_decrypt(test_priv_dec, cipher)
+    assert 'decryption failed' in str(excinfo.value)
+
+    with raises(Exception) as excinfo:
+        cipher = urandom(len(iv)), ciphertext, tag, pub_enc
+        dh_decrypt(test_priv_dec, cipher)
+    assert 'decryption failed' in str(excinfo.value)
+
 
 #####################################################
 # TASK 6 -- Time EC scalar multiplication
