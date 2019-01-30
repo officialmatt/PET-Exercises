@@ -117,7 +117,6 @@ def mix_client_one_hop(public_key, address, message):
     Returns an 'OneHopMixMessage' with four parts: a public key, an hmac (20 bytes),
     an address ciphertext (256 + 2 bytes) and a message ciphertext (1002 bytes). 
     """
-
     G = EcGroup()
     assert G.check_point(public_key)
     assert isinstance(address, bytes) and len(address) <= 256
@@ -133,6 +132,28 @@ def mix_client_one_hop(public_key, address, message):
     client_public_key  = private_key * G.generator()
 
     ## ADD CODE HERE
+    
+    ## First get a shared key
+    shared_element = private_key * public_key
+    key_material = sha512(shared_element.export()).digest()
+
+    # Use different parts of the shared key for different operations
+    hmac_key = key_material[:16]
+    address_key = key_material[16:32]
+    message_key = key_material[32:48]
+
+
+    ## Encrypt the address and the message
+    iv = b"\x00"*16
+
+    address_cipher = aes_ctr_enc_dec(address_key, iv, address_plaintext)
+    message_cipher = aes_ctr_enc_dec(message_key, iv, message_plaintext)  
+    
+    ## Check the HMAC
+    h = Hmac(b"sha512", hmac_key)        
+    h.update(address_cipher)
+    h.update(message_cipher)
+    expected_mac = h.digest()[:20]
 
     return OneHopMixMessage(client_public_key, expected_mac, address_cipher, message_cipher)
 
@@ -257,11 +278,69 @@ def mix_client_n_hop(public_keys, address, message):
     address_plaintext = pack("!H256s", len(address), address)
     message_plaintext = pack("!H1000s", len(message), message)
 
+    hmacs = []
+    address_cipher = address_plaintext
+    message_cipher = message_plaintext
+
     ## Generate a fresh public key
     private_key = G.order().random()
     client_public_key  = private_key * G.generator()
 
+
+    blinding_factor = 1
+    new_ec_public_keys = []
+
+
     ## ADD CODE HERE
+    i = 0
+    for public_key in public_keys:
+        # We don't want to blind the first key 
+        if i == 0:
+            new_ec_public_keys.append(public_key)
+        else:
+            ## First get a shared key
+            ## public key part is the last seen public key
+            shared_element = private_key * new_ec_public_keys[-1]
+            key_material = sha512(shared_element.export()).digest()
+
+            # Building up list of all public keys  - they have been blinded
+            blinding_factor *= Bn.from_binary(key_material[48:])
+            new_ec_public_keys.append(blinding_factor * public_key)
+        i +=1 
+
+    # Want to encrypt message with the first mix's key on the outside - reverse our public keys for this
+    for key in reversed(new_ec_public_keys):
+          ## First get a shared key
+        shared_element = private_key * key
+        key_material = sha512(shared_element.export()).digest()
+
+        # Use different parts of the shared key for different operations
+        hmac_key = key_material[:16]
+        address_key = key_material[16:32]
+        message_key = key_material[32:48]
+
+        iv = b"\x00"*16
+        # Build cipher on top of cipher from last mix to create message such as P1(P2(P3...(M)))
+        address_cipher = aes_ctr_enc_dec(address_key, iv, address_cipher)
+        message_cipher = aes_ctr_enc_dec(message_key, iv, message_cipher)  
+        
+        ## Check the HMAC
+        h = Hmac(b"sha512", hmac_key)        
+
+        # Decrypt hmacs
+        new_hmacs = []
+        for i, other_mac in enumerate(hmacs):
+            # Ensure the IV is different for each hmac
+            iv = pack("H14s", i, b"\x00"*14)
+            hmac_plaintext = aes_ctr_enc_dec(hmac_key, iv, other_mac)
+            h.update(hmac_plaintext)
+            new_hmacs += [hmac_plaintext]
+
+        h.update(address_cipher)
+        h.update(message_cipher)
+        expected_mac = h.digest()[:20]
+
+        hmacs = [expected_mac] + new_hmacs
 
     return NHopMixMessage(client_public_key, hmacs, address_cipher, message_cipher)
 
@@ -312,8 +391,25 @@ def analyze_trace(trace, target_number_of_friends, target=0):
     """
 
     ## ADD CODE HERE
+    # Dictionary to keep count of how many times a reciever has been sent a message
+    receive_count = {}
 
-    return []
+    for senders, receivers in trace:
+        # Only interested in recievers when alice is one of the senders
+        if target in senders:
+            for potential_friend in receivers:
+                if potential_friend in receive_count:
+                    receive_count[potential_friend] +=1
+                else:
+                    receive_count[potential_friend] = 1
+
+    # Sort the dict so that reciever who has been sent the most messages is first
+    sorted_counts = sorted(receive_count.items(), key=lambda kv: kv[1], reverse=True)
+
+    # take the first n recievers where n is the target number of friends
+    friends = [x for (x, y) in sorted_counts[:target_number_of_friends]]
+
+    return friends
 
 ## TASK Q1 (Question 1): The mix packet format you worked on uses AES-CTR with an IV set to all zeros. 
 #                        Explain whether this is a security concern and justify your answer.
