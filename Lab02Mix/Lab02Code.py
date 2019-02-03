@@ -287,7 +287,7 @@ def mix_client_n_hop(public_keys, address, message):
     client_public_key  = private_key * G.generator()
 
 
-    blinding_factor = 1
+    blinding_factor = Bn(1)
     new_ec_public_keys = []
 
 
@@ -320,7 +320,7 @@ def mix_client_n_hop(public_keys, address, message):
         message_key = key_material[32:48]
 
         iv = b"\x00"*16
-        # Build cipher on top of cipher from last mix to create message such as P1(P2(P3...(M)))
+        # Build cipher on top of cipher from last mix to create message such as P1(P2(P3...(M)...))
         address_cipher = aes_ctr_enc_dec(address_key, iv, address_cipher)
         message_cipher = aes_ctr_enc_dec(message_key, iv, message_cipher)  
         
@@ -415,6 +415,13 @@ def analyze_trace(trace, target_number_of_friends, target=0):
 #                        Explain whether this is a security concern and justify your answer.
 
 """ TODO: Your answer HERE """
+'''It is very imortant when using AES_CTR that the same IV is not used with the same key to encrypt a message 
+as it is this that would cause serious security concerns. Re-using an IV and key would effectively give away the plaintext of a message, reducing the privacy of our message.
+In our implementation, we are creating a random private key which is then used along with the IV in the encryption algorithm. 
+However, we cannot assume that the same private key would be produced more than once - whilst the probability is small it is not impossible and therefore using an IV set to all zeros could cause security concern. 
+Producing a new, random IV each time would therefore improve the security of our implementation. 
+
+'''
 
 
 ## TASK Q2 (Question 2): What assumptions does your implementation of the Statistical Disclosure Attack 
@@ -422,4 +429,9 @@ def analyze_trace(trace, target_number_of_friends, target=0):
 #                        the correctness of the result returned dependent on this background distribution?
 
 """ TODO: Your answer HERE """
+'''The implemenation assumes that friends of Alice would only exist in traces where Alice exists as a sender.
+ We are assuming that receivers who receive most messages most frequently in these traces are more likely to be Alice's friends. 
+ We are also assuming that there is no latency in the traffic and that all receivers are sent messages from a sender in that same trace and that there is no delay. 
+ The correctness of the result does depend on this assumption as a delay in receiving a packet would produce different results
 
+'''
