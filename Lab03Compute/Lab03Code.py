@@ -32,6 +32,8 @@ def keyGen(params):
    (G, g, h, o) = params
    
    # ADD CODE HERE
+   priv = o.random()
+   pub = priv * g
 
    return (priv, pub)
 
@@ -41,7 +43,12 @@ def encrypt(params, pub, m):
         raise Exception("Message value to low or high.")
 
    # ADD CODE HERE
+    (G, g, h, o) = params
+    k = o.random()
+    gk = k * g
+    b = (k * pub) + (m*h)
 
+    c = (gk,b)
     return c
 
 def isCiphertext(params, ciphertext):
@@ -51,6 +58,7 @@ def isCiphertext(params, ciphertext):
     a, b = ciphertext
     ret &= G.check_point(a)
     ret &= G.check_point(b)
+
     return ret
 
 _logh = None
@@ -76,7 +84,8 @@ def decrypt(params, priv, ciphertext):
     a , b = ciphertext
 
    # ADD CODE HERE
-
+    (G, g, h, o) = params
+    hm = b + (-priv * a)
     return logh(params, hm)
 
 #####################################################
@@ -92,6 +101,10 @@ def add(params, pub, c1, c2):
     assert isCiphertext(params, c2)
 
    # ADD CODE HERE
+    a1,b1 = c1
+    a2,b2 = c2
+    c3 = (a1+a2, b1+b2)
+
 
     return c3
 
@@ -101,6 +114,8 @@ def mul(params, pub, c1, alpha):
     assert isCiphertext(params, c1)
 
    # ADD CODE HERE
+    a,b = c1
+    c3 = (alpha*a, alpha*b)
 
     return c3
 
@@ -114,6 +129,10 @@ def groupKey(params, pubKeys=[]):
     (G, g, h, o) = params
 
    # ADD CODE HERE
+    pub = pubKeys[0]
+
+    for key in pubKeys[1:]:
+        pub +=key
 
     return pub
 
@@ -123,6 +142,9 @@ def partialDecrypt(params, priv, ciphertext, final=False):
     assert isCiphertext(params, ciphertext)
     
     # ADD CODE HERE
+    a1,b = ciphertext
+      
+    b1 = b + (-priv * a1)
 
     if final:
         return logh(params, b1)
@@ -142,7 +164,12 @@ def corruptPubKey(params, priv, OtherPubKeys=[]):
         corrupt authority. """
     (G, g, h, o) = params
     
-   # ADD CODE HERE
+   # ADD CODE HERE    
+    OtherPubKeys = OtherPubKeys + priv
+    pub = OtherPubKeys[0]
+
+    for key in OtherPubKeys[1:]:
+        pub +=key
 
     return pub
 
