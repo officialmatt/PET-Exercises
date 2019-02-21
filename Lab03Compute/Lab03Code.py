@@ -165,13 +165,12 @@ def corruptPubKey(params, priv, OtherPubKeys=[]):
     (G, g, h, o) = params
     
    # ADD CODE HERE    
-    OtherPubKeys = OtherPubKeys + priv
-    pub = OtherPubKeys[0]
+    corrupt_pub = priv * g
 
-    for key in OtherPubKeys[1:]:
-        pub +=key
+    for key in OtherPubKeys:
+        corrupt_pub -= key
 
-    return pub
+    return corrupt_pub
 
 #####################################################
 # TASK 5 -- Implement operations to support a simple
@@ -185,6 +184,10 @@ def encode_vote(params, pub, vote):
     assert vote in [0, 1]
 
    # ADD CODE HERE
+    v0 = encrypt(params, pub, (1-vote))
+    v1 = encrypt(params, pub, vote)
+
+    
 
     return (v0, v1)
 
@@ -194,7 +197,12 @@ def process_votes(params, pub, encrypted_votes):
     assert isinstance(encrypted_votes, list)
     
    # ADD CODE HERE
+    (tv0, tv1) = encrypted_votes[0]
 
+    for (t0,t1) in encrypted_votes[1:]:
+        tv0 =  add(params, pub, t0, tv0)
+        tv1 = add(params, pub, t1, tv1)
+    
     return tv0, tv1
 
 def simulate_poll(votes):
@@ -246,6 +254,17 @@ def simulate_poll(votes):
 
 """ Your Answer here """
 
+""" If the adversary has the ability to perform homomorphic operations, then they no-doubt have the advantage of being able to guess b.
+We are told that:
+b:0 -> C = Ca + Cb
+b:1 -> C = Cb + Cc
+
+Therefore, if the adversary can calculate C - Cb, then they will get a result of either Ca or Cc depending on the value of b. Comparing the result
+with the values of Ca and Cc supplied by H2 will inform the adversary of the value of b.
+
+The security implication of this is that the adversery can easily undo homomophic operations performed given that they know the equations used
+and are given values used to calculate them.
+"""
 ###########################################################
 # TASK Q2 -- Answer questions regarding your implementation
 #
@@ -256,3 +275,11 @@ def simulate_poll(votes):
 # be detected given your implementation?
 
 """ Your Answer here """
+"""
+A: To disrupt the poll so that it yieilds no result, the malicious user can simply modify the number of votes used in encode_votes to a value that would yield no result.
+For example, the user could set the number of votes to zero, giving no result.
+B: Similarly to manipulate the poll to give an arbilary result the user could modify the number of votes to give the result they want. 
+
+These actions would not be detected in my implementation as encode_vote does not attempt to verify the input of the number of votes, thus allowing a 
+malicious user to modify them.
+"""
