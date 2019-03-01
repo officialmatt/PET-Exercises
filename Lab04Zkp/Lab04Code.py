@@ -51,7 +51,16 @@ def proveKey(params, priv, pub):
     """  
     (G, g, hs, o) = params
     
+    
     ## YOUR CODE HERE:
+    w = o.random()
+    W = w * g
+
+    elements = [g, W]
+    c = to_challenge(elements)
+
+    r = (w - c * priv) % o
+
     
     return (c, r)
 
@@ -90,8 +99,24 @@ def proveCommitment(params, C, r, secrets):
     """
     (G, g, (h0, h1, h2, h3), o) = params
     x0, x1, x2, x3 = secrets
+    allSecrets = [x0, x1, x2, x3]
 
     ## YOUR CODE HERE:
+    w = [o.random() for i in range(5)]
+
+
+    W1 = w[0] * g + w[1] * h0 + w[2] * h1 + w[3] * h2 + w[4] * h3
+
+
+    elements = [g, h0, h1,h2,h3,W1]
+    c = to_challenge(elements)
+    responses = []
+    for i in range(4):
+        r1 = w[i+1] - (c * allSecrets[i]) % o
+        responses.append(r1)
+    rr = w[0] - (c * r) %o
+    responses.append(rr)
+
 
     return (c, responses)
 
@@ -139,8 +164,13 @@ def verifyDLEquality(params, K, L, proof):
     c, r = proof
 
     ## YOUR CODE HERE:
+    k = c*K + r*g
+    l = c * L + r*h0
 
-    return # YOUR RETURN HERE
+    c_prime = to_challenge([g, h0, k,l])
+
+
+    return  c_prime == c
 
 #####################################################
 # TASK 4 -- Prove correct encryption and knowledge of 
@@ -164,6 +194,18 @@ def proveEnc(params, pub, Ciphertext, k, m):
     a, b = Ciphertext
 
     ## YOUR CODE HERE:
+    w1 = o.random()
+    w2 = o.random()
+
+    Wa = w1 * g
+    Wb = w1 * pub + w2*h0
+
+    c = to_challenge([g, h0, Wa, Wb, pub,a,b])
+
+    rk = (w1 - c * k) % o
+    rm = (w2 - c * m) % o
+
+
 
     return (c, (rk, rm))
 
@@ -174,8 +216,13 @@ def verifyEnc(params, pub, Ciphertext, proof):
     (c, (rk, rm)) = proof
 
     ## YOUR CODE HERE:
+    k = c*a + rk*g
+    l = c *b + rk * pub + rm*h0
 
-    return ## YOUR RETURN HERE
+    c_prime = to_challenge([g, h0, k, l, pub,a,b])
+
+
+    return  c_prime == c
 
 
 #####################################################
