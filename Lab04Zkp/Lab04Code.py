@@ -246,16 +246,34 @@ def prove_x0eq10x1plus20(params, C, x0, x1, r):
     (G, g, (h0, h1, h2, h3), o) = params
 
     ## YOUR CODE HERE:
+    # C = r * g + x1 * h1 + (10 * x1 + 20) * h0 (sub in x0)
+    # Need random for r, x1
 
-    return ## YOUR RETURN HERE
+    wR = o.random()
+    wX1 = o.random()
+
+    cW = wR * g + wX1 * h1 + (10 * wX1) * h0
+
+    c = to_challenge([g, h0, h1, cW])
+
+    r1 = (wR - c * r) % o
+    r2 = (wX1 - c * x1) % o
+    
+    return (c, (r1,r2))
 
 def verify_x0eq10x1plus20(params, C, proof):
     """ Verify that proof of knowledge of C and x0 = 10 x1 + 20. """
     (G, g, (h0, h1, h2, h3), o) = params
 
     ## YOUR CODE HERE:
+    (c, (r1,r2)) = proof
+    # Cz*g^-d => g = h0, d = 20
+    sub = c*(C - 20*h0)
+    cW = r1 * g + r2 * h1 + (10 * r2) * h0 + sub
 
-    return ## YOUR RETURN HERE
+    cPrime = to_challenge([g, h0, h1, cW])
+
+    return  cPrime == c
 
 #####################################################
 # TASK 6 -- (OPTIONAL) Prove that a ciphertext is either 0 or 1
