@@ -320,6 +320,13 @@ def test_bin_incorrect():
 
 """ TODO: Your answer here. """
 
+"""Plausible deniability does NOT hold against a dishonest verifier that deviates from the Schnorr
+identification protocol. This is possible if the verifier does not send a random challenge as would
+be sent by an honest verifier. The dishonest verifier could send a hash of W which can then be proved by the prover. 
+This is in fact known as the non-interactive Schnorr identification protocol.
+
+"""
+
 #####################################################
 # TASK Q2 - Answer the following question:
 #
@@ -332,6 +339,13 @@ def test_bin_incorrect():
 # Hint: Look at "test_prove_something" too.
 
 """ TODO: Your answer here. """
+
+"""
+The verifier is checking that c1 + c2 = C where c1 proves knowledge of x and c2 proves knowledge of y. 
+This should prove the prover knows the values of x and y, however as c1 + c2 = C, it proves that he knows either x or y. 
+This is because c2 = C - c1 or c1 = C-c2 can be substitued in which would only prove knowledge of x or y respectively. Therefore the 
+verifier can only be convinced of the knowledge of either x or y and not both.
+"""
 
 def prove_something(params, KX, KY, y):
     (G, g, _, o) = params
