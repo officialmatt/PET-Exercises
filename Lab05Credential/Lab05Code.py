@@ -93,7 +93,22 @@ def credential_EncryptUserSecret(params, pub, priv):
     ## TODO
 
     # Return the fresh v, the encryption of v and the proof.
+    wK = o.random()
+    wV = o.random()
+    wPriv = o.random()
+
+    WK = wK * g
+    WV = wK * pub + wV *g
+    WPriv = wPriv * g 
+
+    c = to_challenge([g,pub,a,b, WK, WV, WPriv])
+    
+    rk = (wK - c*k) % o
+    rv = (wV - c*v) % o
+    rpriv = (wPriv - c*priv) % o
+
     proof = (c, rk, rv, rpriv)
+
     return v, ciphertext, proof
 
 
@@ -143,11 +158,19 @@ def credential_Issuing(params, pub, ciphertext, issuer_params):
     #     and x1b = (b * x1) mod o 
     
     # TODO 1 & 2
+    beta = o.random()
+    u = beta*g
+    X1b = beta * X1
+    x1b = (beta * x1) % o 
 
     # 3) The encrypted MAC is u, and an encrypted u_prime defined as 
     #    E( (b*x0) * g + (x1 * b * v) * g ) + E(0; r_prime)
     
     # TODO 3
+    r_prime = o.random()
+
+    new_a = r_prime * g + x1b * a
+    new_b = r_prime * pub + x1b * b + x0 * u 
 
     ciphertext = new_a, new_b
 
@@ -162,6 +185,15 @@ def credential_Issuing(params, pub, ciphertext, issuer_params):
     #       Cx0 = x0 * g + x0_bar * h }
 
     ## TODO proof
+    wX1 = o.random()
+    wBeta = o.random()
+    wx1b = o.random()
+    wr_prime = o.random()
+    wx0 = o.random()
+    wx0_bar = o.random()
+
+    WX1 = wX1 * h
+    
 
     proof = (c, rs, X1b) # Where rs are multiple responses
 
