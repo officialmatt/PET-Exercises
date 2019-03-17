@@ -193,7 +193,24 @@ def credential_Issuing(params, pub, ciphertext, issuer_params):
     wx0_bar = o.random()
 
     WX1 = wX1 * h
-    
+    WX1b = wBeta * X1
+    WX1b2 = wx1b * h
+    Wu = wBeta * g
+    Wnew_a = wr_prime * g + wx1b * a
+    Wnew_b = wr_prime * pub + wx1b * b + wx0 * u
+    WCx0 = wx0 * g + wx0_bar*h
+
+    c = to_challenge([g, h, pub, a, b, X1, X1b, new_a, new_b, Cx0, WX1, WX1b, WX1b2, Wu, Wnew_a, Wnew_b, WCx0  ])
+
+    rx1 =  (wX1 - c*x1) % o
+    rbeta =  (wBeta - c*beta) % o
+    rx1b =  (wx1b - c*x1b) % o
+    rr_prime =  (wr_prime - c*r_prime) % o
+    rx0 =  (wx0 - c*x0) % o
+    rx0_bar =  (wx0_bar - c*x0_bar) % o
+
+    rs = [rx1, rbeta, rx1b, rr_prime, rx0, rx0_bar]
+
 
     proof = (c, rs, X1b) # Where rs are multiple responses
 
@@ -259,11 +276,18 @@ def credential_show(params, issuer_pub_params, u, u_prime, v):
     #    random alpha.
     
     # TODO 1
+    alpha = o.random()
+    u = alpha *  u
+    u_prime = alpha * u_prime
 
     # 2) Implement the "Show" protocol (p.9) for a single attribute v.
     #    Cv is a commitment to v and Cup is C_{u'} in the paper. 
 
     # TODO 2
+    z1 = o.random()
+    r = o.random()
+    Cv = v* u + z1*h
+    Cup = u_prime + (r * g)
 
     tag = (u, Cv, Cup)
 
@@ -274,6 +298,18 @@ def credential_show(params, issuer_pub_params, u, u_prime, v):
     #           V  = r * (-g) + z1 * X1 }
 
     ## TODO proof
+    wr = o.random()
+    wz1 = o.random()
+    wv = o.random()
+
+    WCv = wv * u + wz1 * h
+    WV = wr * (-g) + wz1 * X1
+
+    c = to_challenge([g,h,u,WCv, WV, Cv, X1, Cx0, Cup])
+
+    rr =  (wr - c*r) % o
+    rz1 =  (wz1 - c*z1) % o
+    rv =  (wv - c*v) % o
 
     proof = (c, rr, rz1, rv)
     return tag, proof
@@ -293,6 +329,12 @@ def credential_show_verify(params, issuer_params, tag, proof):
     (u, Cv, Cup) = tag
 
     ## TODO
+    V = (x0*u + x1*Cv) - Cup #equation on P9 - use minus for divide by Cup
+
+    WCv_prime =  (rv * u + rz1 * h) + (c*Cv)
+    WV_prime = rr * (-g) + rz1 * X1 +  (c*V)
+
+    c_prime = to_challenge([g,h,u,WCv_prime, WV_prime, Cv, X1, Cx0, Cup])
 
     return c == c_prime
 
@@ -318,6 +360,39 @@ def credential_show_pseudonym(params, issuer_pub_params, u, u_prime, v, service_
 
     ## TODO (use code from above and modify as necessary!)
 
+    z1 = o.random()
+    r = o.random()
+
+
+    Cv = v* u + z1*h
+    Cup = u_prime + (r * g)
+
+    tag = (u, Cv, Cup)
+
+    # Proof or knowledge of the statement
+    #
+    # NIZK{(r, z1,v): 
+    #           Cv = v *u + z1 * h and
+    #           V  = r * (-g) + z1 * X1 }
+
+    ## TODO proof
+    wr = o.random()
+    wz1 = o.random()
+    wv = o.random()
+
+    WCv = wv * u + wz1 * h
+    WV = wr * (-g) + wz1 * X1
+    WPseudo = wv * N
+
+    c = to_challenge([g,h,u,WCv, WV, Cv, X1, Cx0, Cup, WPseudo, pseudonym])
+
+    rr =  (wr - c*r) % o
+    rz1 =  (wz1 - c*z1) % o
+    rv =  (wv - c*v) % o
+    rPseudo = (wv - c*v) % o
+
+    proof = (c, rr, rz1, rv, rPseudo)
+
     return pseudonym, tag, proof
 
 def credential_show_verify_pseudonym(params, issuer_params, pseudonym, tag, proof, service_name):
@@ -337,6 +412,16 @@ def credential_show_verify_pseudonym(params, issuer_params, pseudonym, tag, proo
     ## Verify the correct Show protocol and the correctness of the pseudonym
 
     # TODO (use code from above and modify as necessary!)
+    (c, rr, rz1, rv, rPseudo) = proof
+    (u, Cv, Cup) = tag
+
+    V = (x0*u + x1*Cv) - Cup #equation on P9 - use minus for divide by Cup
+
+    WCv_prime =  (rv * u + rz1 * h) + (c*Cv)
+    WV_prime = rr * (-g) + rz1 * X1 +  (c*V)
+    WPseudo_prime = rPseudo * N +  (c*pseudonym)
+
+    c_prime = to_challenge([g,h,u,WCv_prime, WV_prime, Cv, X1, Cx0, Cup, WPseudo_prime, pseudonym])
 
     return c == c_prime
 
@@ -350,3 +435,11 @@ def credential_show_verify_pseudonym(params, issuer_params, pseudonym, tag, proo
 # would need to be shown to a verifier.
 
 """ Your answer here. """
+
+"""
+Imagine Bob charges his laundry cash card with 10 pounds. Bob will register this 10 pounds, represented in some way as a secret value with the laundry card
+identity provider. The identity provider can create an aMac using this secret value and after proving it correct can issue this back to Bob as
+the credential allowing him to spend the money. Bob can then verify that what he was issued was indeed correct. Bob can also derive a stable 
+pseudonym which can not be linked across other services, which is bound to his secret value (10 pounds). The fact that the Pseudonym is unsinkable 
+provides privacy. Each time Bob wants to do some laundry, a new unique Pseudonym is generated in order to avoid double spending. 
+"""
